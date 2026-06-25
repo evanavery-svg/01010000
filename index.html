@@ -55,7 +55,7 @@
           </svg>
         </span>
         <input id="searchInput" name="q" type="text" inputmode="search"
-               placeholder="Search an item — e.g. AirPods Pro" aria-label="Item to check" />
+               placeholder="Search an item or paste a product link" aria-label="Item or product link to check" />
         <button class="search-btn" type="submit">
           <span class="search-btn-label">Check</span>
           <svg class="search-btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -67,9 +67,11 @@
 
     <section id="result" class="result" hidden aria-live="polite"></section>
 
+    <section id="deals" class="deals" aria-label="Trending deals"></section>
+
     <p class="data-note">
-      Estimated history shown for illustration. Connect a retail price API in
-      <code>js/app.js</code> to surface live data.
+      Estimated history shown for illustration. Set <code>apiBase</code> in
+      <code>js/config.js</code> to surface live data.
     </p>
   </main>
 
@@ -82,6 +84,6 @@
   <!-- Hover tooltip lives at body level so it can overflow the chart card -->
   <div id="tooltip" class="tooltip" hidden></div>
 
-  <script src="./js/app.js" defer></script>
+  <script type="module" src="./js/app.js"></script>
 </body>
 </html>
