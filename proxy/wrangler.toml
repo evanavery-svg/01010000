@@ -1,0 +1,12 @@
+name = "tracer-price-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Choose your upstream: "rapid" (RapidAPI, Gmail-friendly) or "bestbuy".
+[vars]
+PROVIDER = "rapid"
+# RAPIDAPI_HOST = "real-time-product-search.p.rapidapi.com"
+
+# Secrets are NOT stored here. Set them with wrangler:
+#   npx wrangler secret put RAPIDAPI_KEY      # for PROVIDER = "rapid"
+#   npx wrangler secret put BESTBUY_KEY       # for PROVIDER = "bestbuy"

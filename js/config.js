@@ -6,14 +6,15 @@
    ============================================================ */
 
 export const CONFIG = {
-  // Base URL of a price API that returns historical prices.
-  // Leave null to use the built-in deterministic estimate model.
+  // URL of your price proxy (see /proxy). Leave null to use the
+  // built-in estimate model. You can also turn live data on without
+  // editing this file:
+  //   • add ?api=<url> to the page URL, or
+  //   • run localStorage.setItem("tracer-api-base", "<url>")
   //
-  //   apiBase: "https://your-price-api.example.com",
-  //
-  // When set, Tracer calls:  `${apiBase}/history?q=<query>`
-  // and expects JSON: { series:[{ t:<ms>, price:<number> }, ...],
-  //                     category?:string, currency?:string }
+  // Tracer calls:  GET `${apiBase}?q=<query>`  and accepts either
+  //   { series:[{ t:<ms>, price:<number> }], category?, currency? }   ← real history
+  //   { current:<number>, category?, retailer?, currency? }           ← real current price
   apiBase: null,
 
   // Optional bearer token sent as `Authorization: Bearer <token>`.

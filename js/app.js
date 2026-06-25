@@ -3,6 +3,7 @@
    ============================================================ */
 import { fmt, pct, pct1, escapeHtml, dateShort } from "./util.js";
 import { getPriceData, isLive, SOURCE } from "./providers.js";
+import { generateSeries } from "./model.js";
 import { parseQuery, buildOffers } from "./retailers.js";
 import { computeStats, dealScore, forecast, buildVerdict } from "./insights.js";
 import { drawChart, sparkline } from "./chart.js";
@@ -83,13 +84,27 @@ function draw() {
   const cheapest = offers.find((o) => o.best);
   const title = parsed.title;
 
-  const sourceBadge = data.source === SOURCE.LIVE
-    ? `<span class="src live">● Live</span>`
-    : `<span class="src" title="Estimated history — connect an API in config.js for live data">Estimate</span>`;
+  let sourceBadge, notice = "";
+  if (data.source === SOURCE.LIVE) {
+    sourceBadge = `<span class="src live">● Live</span>`;
+  } else if (data.source === SOURCE.LIVE_CURRENT) {
+    sourceBadge = `<span class="src live">● Live price</span>`;
+    notice = `<div class="card notice info reveal d1">${ICON.info}
+      <p><strong>Live current price${data.retailer ? ` from ${escapeHtml(data.retailer)}` : ""}.</strong>
+      The chart is an estimated trend anchored to today's real price — history isn't live.</p></div>`;
+  } else {
+    sourceBadge = `<span class="src sample">Sample data</span>`;
+    notice = `<div class="card notice warn reveal d1">${ICON.info}
+      <p><strong>These prices are simulated, not live.</strong>
+      Tracer is showing demo data. Connect a free price source (see the
+      <a href="https://github.com/evanavery-svg/01010000/tree/main/proxy" target="_blank" rel="noopener">proxy setup</a>)
+      to show real prices.</p></div>`;
+  }
   const fromBadge = parsed.kind === "url" && parsed.retailer
     ? `<span class="src">from ${escapeHtml(parsed.retailer)}</span>` : "";
 
   resultEl.innerHTML = `
+    ${notice}
     <div class="card item-head reveal d1">
       <div class="item-id">
         <span class="verdict ${verdict.cls}"><span class="pulse"></span>${verdict.label}</span>
@@ -242,6 +257,7 @@ const ICON = {
   csv: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M12 18v-6M9 15l3 3 3-3"/></svg>`,
   arrow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`,
   spark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4.5"/></svg>`,
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>`,
 };
 
 /* ---------------- Feature 7: deal feed ---------------- */
@@ -257,18 +273,19 @@ async function renderDeals() {
   const shuffled = [...POOL].sort((a, b) =>
     ((dayseed * 9301 + a.length * 49297) % 233280) - ((dayseed * 9301 + b.length * 49297) % 233280));
 
-  const scored = await Promise.all(shuffled.slice(0, 9).map(async (name) => {
-    const data = await getPriceData({ title: name });
+  // Always modeled — a discovery teaser that never hammers a live API.
+  const scored = shuffled.slice(0, 9).map((name) => {
+    const data = generateSeries(name);
     const stats = computeStats(data.series);
     return { name, data, stats, deal: dealScore(stats) };
-  }));
+  });
   scored.sort((a, b) => b.deal.score - a.deal.score);
   const top = scored.slice(0, 6);
 
   host.innerHTML = `
     <div class="deals-head">
-      <h2>Trending <span>now</span></h2>
-      <p>Live deal scores on popular items — green is a good time to buy, red means wait.</p>
+      <h2>Trending <span>now</span> <span class="sample-tag">sample</span></h2>
+      <p>Deal scores on popular items — green is a good time to buy, red means wait.</p>
     </div>
     <div class="deal-grid">
       ${top.map((d) => `

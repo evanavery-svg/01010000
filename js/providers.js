@@ -1,52 +1,97 @@
 /* ============================================================
-   Price data providers (Feature 1: live-data ready).
+   Price data providers.
 
    `getPriceData()` is the single seam between the UI and where
-   prices come from. It tries a live API when one is configured in
-   config.js and transparently falls back to the estimate model,
-   so the product works perfectly with or without a backend.
+   prices come from. It calls a configured proxy endpoint and
+   transparently falls back to the estimate model, so the product
+   works with or without a backend.
+
+   Accepted proxy responses (GET `${apiBase}?q=<query>`):
+     • Full history:  { series:[{t,price}], category?, currency? }
+     • Current only:  { current:<number>, category?, retailer?, currency? }
+   For "current only" we anchor the modeled trend to the real price,
+   so today's headline number is real and the history is clearly
+   labelled as an estimated trend.
    ============================================================ */
 import { CONFIG } from "./config.js";
 import { generateSeries } from "./model.js";
 import { hashStr } from "./util.js";
 
-const SOURCE = { LIVE: "live", ESTIMATE: "estimate" };
+export const SOURCE = { LIVE: "live", LIVE_CURRENT: "live-current", ESTIMATE: "estimate" };
 
-async function fetchLive(query, signal) {
-  const url = `${CONFIG.apiBase.replace(/\/$/, "")}/history?q=${encodeURIComponent(query)}`;
+/* Effective API base: ?api= URL param > localStorage > config.js.
+   Lets you turn live data on without editing files (great for testing). */
+export function effectiveApiBase() {
+  try {
+    const p = new URLSearchParams(location.search).get("api");
+    if (p) return p;
+    const ls = localStorage.getItem("tracer-api-base");
+    if (ls) return ls;
+  } catch { /* non-browser */ }
+  return CONFIG.apiBase;
+}
+
+export function isLive() {
+  return Boolean(effectiveApiBase());
+}
+
+function anchorToPrice(series, current) {
+  const last = series[series.length - 1].price || current;
+  const k = current / last;
+  return series.map((p) => ({ t: p.t, price: Math.round(p.price * k * 100) / 100 }));
+}
+
+async function fetchProxy(query, signal) {
+  const base = effectiveApiBase().replace(/\/+$/, "");
+  const url = `${base}${base.includes("?") ? "&" : "?"}q=${encodeURIComponent(query)}`;
   const headers = { Accept: "application/json" };
   if (CONFIG.apiKey) headers.Authorization = `Bearer ${CONFIG.apiKey}`;
 
   const res = await fetch(url, { headers, signal });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
+  if (json && json.error) throw new Error(json.error);
 
-  const series = (json.series || [])
-    .map((p) => ({ t: +p.t, price: +p.price }))
-    .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.price))
-    .sort((a, b) => a.t - b.t);
-  if (series.length < 8) throw new Error("insufficient history");
+  // 1) full real history
+  if (Array.isArray(json.series)) {
+    const series = json.series
+      .map((p) => ({ t: +p.t, price: +p.price }))
+      .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.price))
+      .sort((a, b) => a.t - b.t);
+    if (series.length >= 8) {
+      return {
+        series, category: json.category || "Product",
+        base: series[0].price, seed: hashStr(query), source: SOURCE.LIVE,
+        retailer: json.retailer || null,
+      };
+    }
+  }
 
-  return {
-    series,
-    category: json.category || "Product",
-    base: series[0].price,
-    seed: hashStr(query),
-    source: SOURCE.LIVE,
-  };
+  // 2) real current price → anchor the modeled trend to it
+  const current = Number(json.current);
+  if (Number.isFinite(current) && current > 0) {
+    const modeled = generateSeries(query);
+    return {
+      series: anchorToPrice(modeled.series, current),
+      category: json.category || modeled.category,
+      base: modeled.base, seed: modeled.seed, source: SOURCE.LIVE_CURRENT,
+      retailer: json.retailer || null, currentReal: current,
+    };
+  }
+
+  throw new Error("unrecognized response shape");
 }
 
 /**
  * Resolve price history for a parsed query.
  * @param {{title:string}} parsed
  * @param {{signal?:AbortSignal}} [opts]
- * @returns {Promise<{series,category,base,seed,source}>}
  */
 export async function getPriceData(parsed, opts = {}) {
   const query = parsed.title;
-  if (CONFIG.apiBase) {
+  if (isLive()) {
     try {
-      return await fetchLive(query, opts.signal);
+      return await fetchProxy(query, opts.signal);
     } catch (err) {
       if (err?.name === "AbortError") throw err;
       console.warn("[Tracer] live price fetch failed, using estimate model:", err.message);
@@ -54,9 +99,3 @@ export async function getPriceData(parsed, opts = {}) {
   }
   return { ...generateSeries(query), source: SOURCE.ESTIMATE };
 }
-
-export function isLive() {
-  return Boolean(CONFIG.apiBase);
-}
-
-export { SOURCE };

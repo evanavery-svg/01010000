@@ -37,29 +37,48 @@ python3 -m http.server 8000
 
 Any static host works (GitHub Pages, Netlify, Vercel, Cloudflare Pages).
 
-## Live price data
+## Sample data vs. live prices — read this
 
-Out of the box, Tracer uses a deterministic estimate model so it's fully
-functional and demoable offline — the same query always returns the same
-history. To switch to **live** prices, edit [`js/config.js`](js/config.js):
+By default Tracer shows **sample data**: a deterministic estimate model, not
+real prices. The same query always returns the same history, so the app is fully
+demoable offline. This is labelled everywhere it appears — a **Sample data**
+badge and a banner on every result — so demo figures are never mistaken for
+real ones.
 
-```js
-export const CONFIG = {
-  apiBase: "https://your-price-api.example.com", // GET /history?q=<query>
-  apiKey:  "optional-bearer-token",
-  // ...
-};
-```
+### Turning on real prices
 
-The API should return JSON shaped like:
+A static web page **cannot** call retail price APIs directly: they block browser
+(CORS) requests, and an API key in front-end code would be exposed. So Tracer
+talks to a tiny proxy you run. There's a ready-to-deploy, free one in
+[`proxy/`](proxy/) (a Cloudflare Worker) — see [proxy/README.md](proxy/README.md).
+
+1. Get a free key (e.g. RapidAPI "Real-Time Product Search" — works with a
+   Gmail address).
+2. `wrangler deploy` the worker with your key as a secret.
+3. Point Tracer at it — no rebuild needed:
+   - `…/index.html?api=https://your-worker.workers.dev`, or
+   - `localStorage.setItem("tracer-api-base", "https://…")`, or
+   - set `apiBase` in [`js/config.js`](js/config.js).
+
+The worker returns the **real current price**. Tracer shows it as the headline
+(green **● Live price** badge) and anchors the trend line to it — the chart is
+still an estimate and says so. A genuine year-long history needs a paid
+historical API (e.g. Keepa); the provider seam in
+[`js/providers.js`](js/providers.js) accepts that shape too:
 
 ```json
 { "series": [{ "t": 1719273600000, "price": 249.0 }], "category": "Audio" }
 ```
 
-`getPriceData()` in [`js/providers.js`](js/providers.js) calls the API when
-`apiBase` is set and transparently falls back to the estimate model on any
-error, so the app never breaks.
+`getPriceData()` calls the proxy when a source is configured and transparently
+falls back to the sample model on any error, so the app never breaks.
+
+You can verify the whole live path locally without deploying anything:
+
+```bash
+node scripts/mock-proxy.mjs 8787
+# open: http://localhost:8137/index.html?api=http://localhost:8787
+```
 
 ## Architecture
 
@@ -80,7 +99,9 @@ js/app.js               UI orchestration, deal feed, routing, PWA glue
 service-worker.js       offline app-shell caching
 manifest.webmanifest    PWA manifest
 icons/                  generated app icons
+proxy/                  deployable Cloudflare Worker for real prices + setup
 scripts/make_icons.py   regenerate icons (pure-stdlib PNG encoder)
+scripts/mock-proxy.mjs  local stand-in for the price proxy (for testing)
 scripts/smoke.mjs       Playwright smoke test (npm i -D playwright to run)
 ```
 
