@@ -1,0 +1,8 @@
+# Node (only used ad-hoc for the Playwright smoke test)
+node_modules/
+package.json
+package-lock.json
+
+# OS / editor
+.DS_Store
+*.log
