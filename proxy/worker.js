@@ -73,11 +73,14 @@ async function rapidProductSearch(q, env) {
   );
   if (!Number.isFinite(price)) throw new Error("no price in result");
 
+  const image = p?.product_photos?.[0] ?? p?.product_photo ?? null;
+
   return {
     current: price,
     currency: p?.offer?.currency || "USD",
     category: p?.product_category || "Product",
     retailer: p?.offer?.store_name || "online",
+    image: typeof image === "string" && image.startsWith("https://") ? image : null,
   };
 }
 

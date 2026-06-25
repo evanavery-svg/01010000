@@ -295,6 +295,26 @@ body {
   margin-bottom: 16px;
 }
 .item-id { flex: 1 1 240px; min-width: 0; }
+
+/* product image */
+.prod-img-wrap {
+  flex: none; align-self: center;
+  width: 88px; height: 88px; border-radius: var(--radius-md);
+  background: var(--surface-2); border: 1px solid var(--stroke);
+  overflow: hidden; display: grid; place-items: center;
+}
+.prod-img {
+  width: 100%; height: 100%; object-fit: contain;
+  transition: transform .3s var(--ease);
+}
+.prod-img:hover { transform: scale(1.06); }
+
+/* recent card image thumbnail */
+.rc-img {
+  flex: none; width: 40px; height: 40px; border-radius: 10px;
+  object-fit: contain; background: var(--surface-2);
+  border: 1px solid var(--stroke);
+}
 .item-name {
   font-size: clamp(22px, 4vw, 30px);
   font-weight: 680; letter-spacing: -.02em;

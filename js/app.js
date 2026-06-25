@@ -56,7 +56,7 @@ async function run(rawInput) {
   state = { parsed, data };
   draw();
   location.hash = encodeURIComponent(parsed.title);
-  pushRecent(parsed.title, state.stats?.current?.price ?? null, data.source);
+  pushRecent(parsed.title, state.stats?.current?.price ?? null, data.source, data.image ?? null);
 }
 
 function showSkeleton(parsed) {
@@ -107,9 +107,14 @@ function draw() {
   const fromBadge = parsed.kind === "url" && parsed.retailer
     ? `<span class="src">from ${escapeHtml(parsed.retailer)}</span>` : "";
 
+  const imgHtml = data.image
+    ? `<div class="prod-img-wrap"><img class="prod-img" src="${escapeHtml(data.image)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.closest('.prod-img-wrap').remove()"/></div>`
+    : "";
+
   resultEl.innerHTML = `
     ${notice}
     <div class="card item-head reveal d1">
+      ${imgHtml}
       <div class="item-id">
         <span class="verdict ${verdict.cls}"><span class="pulse"></span>${verdict.label}</span>
         <h2 class="item-name">${escapeHtml(title)}</h2>
@@ -325,9 +330,9 @@ function getRecent() {
       .filter((x) => x && x.q);
   } catch { return []; }
 }
-function pushRecent(q, price, source) {
+function pushRecent(q, price, source, image) {
   let list = getRecent().filter((x) => x.q.toLowerCase() !== q.toLowerCase());
-  list.unshift({ q, price: price ?? null, live: source && source !== SOURCE.ESTIMATE });
+  list.unshift({ q, price: price ?? null, live: source && source !== SOURCE.ESTIMATE, image: image ?? null });
   list = list.slice(0, 6);
   localStorage.setItem("tracer-recent", JSON.stringify(list));
   renderRecent();
@@ -363,7 +368,9 @@ function renderRecent() {
     <div class="recent-grid">
       ${list.map((r) => `
         <button class="recent-card" type="button" data-q="${escapeHtml(r.q)}">
-          <span class="rc-ico">${ICON.clock}</span>
+          ${r.image
+            ? `<img class="rc-img" src="${escapeHtml(r.image)}" alt="" aria-hidden="true" loading="lazy" onerror="this.style.display='none'">`
+            : `<span class="rc-ico">${ICON.clock}</span>`}
           <span class="rc-main">
             <span class="rc-name">${escapeHtml(r.q)}</span>
             <span class="rc-price">${r.price != null

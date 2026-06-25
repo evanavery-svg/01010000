@@ -62,7 +62,7 @@ async function fetchProxy(query, signal) {
       return {
         series, category: json.category || "Product",
         base: series[0].price, seed: hashStr(query), source: SOURCE.LIVE,
-        retailer: json.retailer || null,
+        retailer: json.retailer || null, image: json.image || null,
       };
     }
   }
@@ -76,6 +76,7 @@ async function fetchProxy(query, signal) {
       category: json.category || modeled.category,
       base: modeled.base, seed: modeled.seed, source: SOURCE.LIVE_CURRENT,
       retailer: json.retailer || null, currentReal: current,
+      image: json.image || null,
     };
   }
 
