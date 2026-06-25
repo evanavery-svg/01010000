@@ -60,9 +60,13 @@ async function rapidProductSearch(q, env) {
   if (!env.RAPIDAPI_KEY) throw new Error("RAPIDAPI_KEY not set");
   const host = env.RAPIDAPI_HOST || "real-time-product-search.p.rapidapi.com";
   const url = `https://${host}/search?q=${encodeURIComponent(q)}&country=us&limit=1`;
-  const r = await fetch(url, {
-    headers: { "X-RapidAPI-Key": env.RAPIDAPI_KEY, "X-RapidAPI-Host": host },
-  });
+
+  // Fetch price + Google image in parallel to minimise latency
+  const [r, image] = await Promise.all([
+    fetch(url, { headers: { "X-RapidAPI-Key": env.RAPIDAPI_KEY, "X-RapidAPI-Host": host } }),
+    googleImage(q),
+  ]);
+
   if (!r.ok) throw new Error(`upstream ${r.status}`);
   const d = await r.json();
   const p = d?.data?.products?.[0] ?? d?.products?.[0];
@@ -73,15 +77,43 @@ async function rapidProductSearch(q, env) {
   );
   if (!Number.isFinite(price)) throw new Error("no price in result");
 
-  const image = p?.product_photos?.[0] ?? p?.product_photo ?? null;
-
   return {
     current: price,
     currency: p?.offer?.currency || "USD",
     category: p?.product_category || "Product",
     retailer: p?.offer?.store_name || "online",
-    image: typeof image === "string" && image.startsWith("https://") ? image : null,
+    image,
   };
+}
+
+/* Fetch the first embeddable image URL from Google Image Search.
+   Runs server-side so there are no CORS / referrer issues for the browser.
+   Returns null silently on any failure — images are always optional. */
+async function googleImage(q) {
+  try {
+    const url = `https://www.google.com/search?q=${encodeURIComponent(q + " product")}&tbm=isch&hl=en&safe=active`;
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+
+    // Google embeds full-res image URLs as encoded strings in the page JS.
+    // Look for https:// image URLs that are NOT Google's own hosting.
+    const re = /"(https:\/\/(?!(?:encrypted-tbn|www\.gstatic|lh[0-9]\.google|www\.google))[^"\\]{20,}\.(?:jpg|jpeg|png|webp)(?:\?[^"\\]{0,120})?)"/g;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      // Skip tiny icons / logos (usually short paths)
+      if (m[1].length > 40) return m[1];
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /* ---- Best Buy Developer API (free key; needs a non-free-email account) ----

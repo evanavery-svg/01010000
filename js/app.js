@@ -108,7 +108,7 @@ function draw() {
     ? `<span class="src">from ${escapeHtml(parsed.retailer)}</span>` : "";
 
   const imgHtml = data.image
-    ? `<div class="prod-img-wrap"><img class="prod-img" src="${escapeHtml(data.image)}" alt="${escapeHtml(title)}" loading="lazy" onerror="this.closest('.prod-img-wrap').remove()"/></div>`
+    ? `<div class="prod-img-wrap"><img class="prod-img" src="${escapeHtml(data.image)}" alt="${escapeHtml(title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.prod-img-wrap').remove()"/></div>`
     : "";
 
   resultEl.innerHTML = `
@@ -369,7 +369,7 @@ function renderRecent() {
       ${list.map((r) => `
         <button class="recent-card" type="button" data-q="${escapeHtml(r.q)}">
           ${r.image
-            ? `<img class="rc-img" src="${escapeHtml(r.image)}" alt="" aria-hidden="true" loading="lazy" onerror="this.style.display='none'">`
+            ? `<img class="rc-img" src="${escapeHtml(r.image)}" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
             : `<span class="rc-ico">${ICON.clock}</span>`}
           <span class="rc-main">
             <span class="rc-name">${escapeHtml(r.q)}</span>
