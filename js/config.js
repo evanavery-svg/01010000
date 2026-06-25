@@ -15,7 +15,7 @@ export const CONFIG = {
   // Tracer calls:  GET `${apiBase}?q=<query>`  and accepts either
   //   { series:[{ t:<ms>, price:<number> }], category?, currency? }   ← real history
   //   { current:<number>, category?, retailer?, currency? }           ← real current price
-  apiBase: null,
+  apiBase: "https://tracer-price-proxy.evanavery-tracer.workers.dev",
 
   // Optional bearer token sent as `Authorization: Bearer <token>`.
   apiKey: null,
