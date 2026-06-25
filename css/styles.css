@@ -152,6 +152,7 @@ body {
 
 /* ---------------- Search ---------------- */
 .search {
+  position: relative;
   display: flex; align-items: center; gap: 8px;
   max-width: 600px; margin: 30px auto 0;
   padding: 8px 8px 8px 18px;
@@ -202,6 +203,72 @@ body {
   transition: all .2s var(--ease);
 }
 .chip:hover { color: var(--text); border-color: var(--stroke-strong); transform: translateY(-1px); }
+
+/* ---------------- Autocomplete (Feature 1) ---------------- */
+.ac {
+  position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+  z-index: 40; margin: 0; padding: 6px; list-style: none;
+  background: var(--surface-2);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  max-height: 340px; overflow-y: auto;
+  text-align: left;
+  animation: acIn .16s var(--ease);
+}
+.ac[hidden] { display: none; }
+@keyframes acIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.ac-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 12px; border-radius: 11px;
+  cursor: pointer; color: var(--text); font-size: 15px;
+  transition: background .12s var(--ease);
+}
+.ac-item:hover, .ac-item.active { background: var(--surface); }
+.ac-ico { flex: none; display: grid; place-items: center; color: var(--text-3); }
+.ac-ico svg { width: 16px; height: 16px; }
+.ac-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-hit { color: var(--orange); font-weight: 650; }
+.ac-price { color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* ---------------- Detection line (Feature 4) ---------------- */
+.detect {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px; padding: 11px 15px;
+  border-radius: var(--radius-sm);
+  background: rgba(255,106,0,.08);
+  border: 1px solid rgba(255,106,0,.22);
+  color: var(--text-2); font-size: 14px;
+}
+.detect svg { flex: none; width: 16px; height: 16px; color: var(--orange); }
+.detect strong { color: var(--text); font-weight: 600; }
+
+/* ---------------- Recently viewed (Feature 3) ---------------- */
+.recent { margin-top: clamp(40px, 7vw, 64px); position: relative; z-index: 1; }
+.recent[hidden] { display: none; }
+.recent-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.recent-head h2 { font-size: clamp(20px, 3.5vw, 26px); letter-spacing: -.025em; margin: 0; font-weight: 700; }
+.recent-clear {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-3); font-size: 13px; font-family: inherit;
+  transition: color .2s var(--ease);
+}
+.recent-clear:hover { color: var(--text); }
+.recent-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.recent-card {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  padding: 14px 16px; border-radius: var(--radius-md);
+  background: var(--surface); border: 1px solid var(--stroke);
+  cursor: pointer; color: var(--text); font-family: inherit;
+  transition: transform .2s var(--ease), border-color .2s var(--ease);
+}
+.recent-card:hover { transform: translateY(-2px); border-color: var(--stroke-strong); }
+.rc-ico { flex: none; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: rgba(255,106,0,.12); color: var(--orange); }
+.rc-ico svg { width: 18px; height: 18px; }
+.rc-main { flex: 1; min-width: 0; }
+.rc-name { display: block; font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-price { display: block; color: var(--text-2); font-size: 13px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.rc-live { color: #34c759; font-weight: 600; }
 
 /* ---------------- Result ---------------- */
 .result { margin-top: clamp(34px, 6vw, 56px); scroll-margin-top: 84px; }

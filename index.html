@@ -55,17 +55,21 @@
           </svg>
         </span>
         <input id="searchInput" name="q" type="text" inputmode="search"
-               placeholder="Search an item or paste a product link" aria-label="Item or product link to check" />
+               placeholder="Search an item or paste a product link" aria-label="Item or product link to check"
+               role="combobox" aria-expanded="false" aria-controls="autocomplete" aria-autocomplete="list" />
         <button class="search-btn" type="submit">
           <span class="search-btn-label">Check</span>
           <svg class="search-btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
+        <ul id="autocomplete" class="ac" role="listbox" aria-label="Suggestions" hidden></ul>
       </form>
 
       <div class="suggests" id="suggests" aria-label="Popular searches"></div>
     </section>
 
     <section id="result" class="result" hidden aria-live="polite"></section>
+
+    <section id="recent" class="recent" aria-label="Recently viewed" hidden></section>
 
     <section id="deals" class="deals" aria-label="Trending deals"></section>
 

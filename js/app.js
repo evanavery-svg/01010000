@@ -41,7 +41,7 @@ async function run(rawInput) {
 
   const token = ++fetchToken;
   activeRange = 365;
-  showSkeleton(parsed.title);
+  showSkeleton(parsed);
 
   let data;
   try {
@@ -56,12 +56,16 @@ async function run(rawInput) {
   state = { parsed, data };
   draw();
   location.hash = encodeURIComponent(parsed.title);
-  pushRecent(parsed.title);
+  pushRecent(parsed.title, state.stats?.current?.price ?? null, data.source);
 }
 
-function showSkeleton(title) {
+function showSkeleton(parsed) {
+  const detect = parsed.kind === "url"
+    ? `<div class="detect">${ICON.info}<span>Detected: <strong>${escapeHtml(parsed.title)}</strong>${parsed.retailer ? ` from ${escapeHtml(parsed.retailer)}` : ""}</span></div>`
+    : "";
   resultEl.hidden = false;
   resultEl.innerHTML = `
+    ${detect}
     <div class="card item-head skeleton">
       <div class="item-id"><div class="sk" style="height:22px;width:55%"></div><div class="sk" style="height:14px;width:35%;margin-top:10px"></div></div>
       <div class="sk" style="height:42px;width:130px"></div>
@@ -258,6 +262,8 @@ const ICON = {
   arrow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>`,
   spark: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4.5"/></svg>`,
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
+  trend: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 7-7"/><path d="M21 8V5h-3"/></svg>`,
 };
 
 /* ---------------- Feature 7: deal feed ---------------- */
@@ -310,21 +316,131 @@ function dealColor(cls) {
 
 /* ---------------- Recent / suggestions ---------------- */
 const DEFAULTS = ["AirPods Pro", "PlayStation 5", "MacBook Air", "Nintendo Switch", "Dyson V15"];
-function getRecent() { try { return JSON.parse(localStorage.getItem("tracer-recent") || "[]"); } catch { return []; } }
-function pushRecent(q) {
-  let list = getRecent().filter((x) => x.toLowerCase() !== q.toLowerCase());
-  list.unshift(q); list = list.slice(0, 5);
-  localStorage.setItem("tracer-recent", JSON.stringify(list));
-  renderSuggests();
+
+// Stored as [{ q, price, live }]; tolerates the old string-only format.
+function getRecent() {
+  try {
+    return JSON.parse(localStorage.getItem("tracer-recent") || "[]")
+      .map((x) => (typeof x === "string" ? { q: x, price: null, live: false } : x))
+      .filter((x) => x && x.q);
+  } catch { return []; }
 }
+function pushRecent(q, price, source) {
+  let list = getRecent().filter((x) => x.q.toLowerCase() !== q.toLowerCase());
+  list.unshift({ q, price: price ?? null, live: source && source !== SOURCE.ESTIMATE });
+  list = list.slice(0, 6);
+  localStorage.setItem("tracer-recent", JSON.stringify(list));
+  renderRecent();
+  buildAcPool();
+}
+function clearRecent() {
+  localStorage.removeItem("tracer-recent");
+  renderRecent();
+  buildAcPool();
+}
+
+// Quick-start chips: static discovery prompts (recents get their own section).
 function renderSuggests() {
   const box = $("#suggests");
-  const recent = getRecent();
-  const items = recent.length ? recent : DEFAULTS;
-  box.innerHTML = `<span class="chip ghost">${recent.length ? "Recent" : "Try"}</span>` +
-    items.map((x) => `<button class="chip" type="button">${escapeHtml(x)}</button>`).join("");
+  box.innerHTML = `<span class="chip ghost">Try</span>` +
+    DEFAULTS.map((x) => `<button class="chip" type="button">${escapeHtml(x)}</button>`).join("");
   box.querySelectorAll("button.chip").forEach((b) =>
     b.addEventListener("click", () => { input.value = b.textContent; run(b.textContent); scrollToResult(); }));
+}
+
+/* ---------------- Recently viewed (Feature 3) ---------------- */
+function renderRecent() {
+  const host = $("#recent");
+  if (!host) return;
+  const list = getRecent();
+  if (!list.length) { host.hidden = true; host.innerHTML = ""; return; }
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="recent-head">
+      <h2>Recently viewed</h2>
+      <button class="recent-clear" type="button">Clear</button>
+    </div>
+    <div class="recent-grid">
+      ${list.map((r) => `
+        <button class="recent-card" type="button" data-q="${escapeHtml(r.q)}">
+          <span class="rc-ico">${ICON.clock}</span>
+          <span class="rc-main">
+            <span class="rc-name">${escapeHtml(r.q)}</span>
+            <span class="rc-price">${r.price != null
+              ? `${fmt.format(r.price)}${r.live ? ` · <span class="rc-live">live</span>` : ""}`
+              : "Tap to check"}</span>
+          </span>
+        </button>`).join("")}
+    </div>`;
+  host.querySelector(".recent-clear").addEventListener("click", clearRecent);
+  host.querySelectorAll(".recent-card").forEach((c) =>
+    c.addEventListener("click", () => { input.value = c.dataset.q; run(c.dataset.q); scrollToResult(); }));
+}
+
+/* ---------------- Autocomplete (Feature 1) ---------------- */
+const acEl = $("#autocomplete");
+let acPool = [];      // [{ label, kind:'recent'|'popular', price }]
+let acVisible = [];   // currently shown subset
+let acIndex = -1;
+
+function buildAcPool() {
+  const recent = getRecent().map((r) => ({ label: r.q, kind: "recent", price: r.price }));
+  const seen = new Set(recent.map((r) => r.label.toLowerCase()));
+  const popular = POOL
+    .filter((p) => !seen.has(p.toLowerCase()))
+    .map((p) => ({ label: p, kind: "popular", price: null }));
+  acPool = [...recent, ...popular];
+}
+
+function highlight(label, q) {
+  const i = label.toLowerCase().indexOf(q);
+  if (i < 0) return escapeHtml(label);
+  return escapeHtml(label.slice(0, i)) +
+    `<span class="ac-hit">${escapeHtml(label.slice(i, i + q.length))}</span>` +
+    escapeHtml(label.slice(i + q.length));
+}
+
+function renderAc(raw) {
+  const q = raw.trim().toLowerCase();
+  // A pasted URL isn't a thing to autocomplete.
+  if (/^(https?:\/\/|www\.)/i.test(raw)) { hideAc(); return; }
+  acVisible = (q ? acPool.filter((x) => x.label.toLowerCase().includes(q)) : acPool).slice(0, 6);
+  acIndex = -1;
+  if (!acVisible.length) { hideAc(); return; }
+  acEl.innerHTML = acVisible.map((x, i) => `
+    <li class="ac-item" role="option" id="ac-opt-${i}" data-i="${i}" aria-selected="false">
+      <span class="ac-ico">${x.kind === "recent" ? ICON.clock : ICON.trend}</span>
+      <span class="ac-label">${q ? highlight(x.label, q) : escapeHtml(x.label)}</span>
+      ${x.price != null ? `<span class="ac-price">${fmt.format(x.price)}</span>` : ""}
+    </li>`).join("");
+  acEl.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+  acEl.querySelectorAll(".ac-item").forEach((li) => {
+    li.addEventListener("mousedown", (e) => { e.preventDefault(); chooseAc(+li.dataset.i); });
+    li.addEventListener("mouseenter", () => setAcIndex(+li.dataset.i));
+  });
+}
+function setAcIndex(i) {
+  acIndex = i;
+  acEl.querySelectorAll(".ac-item").forEach((li, n) => {
+    const on = n === i;
+    li.classList.toggle("active", on);
+    li.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  input.setAttribute("aria-activedescendant", i >= 0 ? `ac-opt-${i}` : "");
+}
+function hideAc() {
+  acEl.hidden = true; acIndex = -1;
+  input.setAttribute("aria-expanded", "false");
+  input.removeAttribute("aria-activedescendant");
+}
+function chooseAc(i) {
+  const item = acVisible[i];
+  if (!item) return;
+  input.value = item.label;
+  hideAc();
+  run(item.label);
+  scrollToResult();
 }
 
 function scrollToResult() {
@@ -338,10 +454,23 @@ form.addEventListener("submit", (e) => {
   e.preventDefault();
   const q = input.value.trim();
   if (!q) { input.focus(); return; }
+  hideAc();
   input.blur();
   run(q);
   scrollToResult();
 });
+
+// Autocomplete interactions
+input.addEventListener("input", () => renderAc(input.value));
+input.addEventListener("focus", () => { if (!input.value.trim()) renderAc(""); });
+input.addEventListener("keydown", (e) => {
+  if (acEl.hidden) return;
+  if (e.key === "ArrowDown") { e.preventDefault(); setAcIndex(Math.min(acIndex + 1, acVisible.length - 1)); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); setAcIndex(Math.max(acIndex - 1, 0)); }
+  else if (e.key === "Enter" && acIndex >= 0) { e.preventDefault(); chooseAc(acIndex); }
+  else if (e.key === "Escape") { hideAc(); }
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".search")) hideAc(); });
 window.addEventListener("hashchange", () => {
   const h = decodeURIComponent(location.hash.replace(/^#/, "")).trim();
   if (h && (!state || state.parsed.title.toLowerCase() !== h.toLowerCase())) { input.value = h; run(h); }
@@ -350,6 +479,8 @@ window.addEventListener("hashchange", () => {
 if (isLive()) $(".data-note")?.setAttribute("hidden", "");
 
 renderSuggests();
+renderRecent();
+buildAcPool();
 renderDeals();
 const initial = decodeURIComponent(location.hash.replace(/^#/, "")).trim();
 if (initial) { input.value = initial; run(initial); }
