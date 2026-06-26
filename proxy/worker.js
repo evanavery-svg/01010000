@@ -25,11 +25,18 @@ export default {
   async fetch(request, env) {
     if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
 
-    const q = new URL(request.url).searchParams.get("q");
+    const u = new URL(request.url);
+    const q = u.searchParams.get("q");
     if (!q) return json({ error: "missing q" }, 400);
 
     try {
       const provider = (env.PROVIDER || "rapid").toLowerCase();
+
+      // ?debug=1 returns the raw upstream product (no cache) for field mapping.
+      if (u.searchParams.get("debug") && provider !== "bestbuy") {
+        return json(await rapidRaw(q, env), 200, { "Cache-Control": "no-store" });
+      }
+
       const data = provider === "bestbuy" ? await bestBuy(q, env) : await rapidProductSearch(q, env);
       // cache at the edge for an hour to stay inside free tiers
       return json(data, 200, { "Cache-Control": "public, max-age=3600" });
@@ -82,19 +89,50 @@ async function rapidProductSearch(q, env) {
   };
 }
 
-/* First usable https image URL from the product result. The API returns
-   Google-hosted URLs (gstatic / googleusercontent) which embed fine in the
-   browser with referrerpolicy="no-referrer". Returns null if none found. */
-function pickImage(p) {
-  const cands = [
-    ...(Array.isArray(p?.product_photos) ? p.product_photos : []),
-    p?.product_photo,
-    p?.offer?.product_photo,
-  ];
-  for (const c of cands) {
-    if (typeof c === "string" && /^https:\/\/\S{10,}/.test(c)) return c;
-  }
-  return null;
+/* Find a usable product image anywhere in the result object. The API's
+   field name for photos varies, so we deep-scan for the first https URL
+   that looks like an image (by extension or by a known image-host pattern),
+   preferring keys named photo/image/img/thumb. Returns null if none found.
+   These URLs embed fine in the browser with referrerpolicy="no-referrer". */
+function pickImage(node) {
+  const IMG = /\.(?:jpe?g|png|webp|gif|avif)(?:[?#]|$)|gstatic|googleusercontent|ggpht|images-amazon|media-amazon|ssl-images-amazon|mzstatic|shopify|cloudfront|scene7|cloudinary|imgix|bbystatic|target\.scene7|samsclubresources/i;
+  const seen = new Set();
+  const walk = (v, depth) => {
+    if (depth > 5 || v == null) return null;
+    if (typeof v === "string") {
+      return /^https:\/\/\S{12,}/.test(v) && IMG.test(v) ? v : null;
+    }
+    if (Array.isArray(v)) {
+      for (const x of v) { const r = walk(x, depth + 1); if (r) return r; }
+      return null;
+    }
+    if (typeof v === "object") {
+      if (seen.has(v)) return null;
+      seen.add(v);
+      // visit photo-ish keys first
+      const keys = Object.keys(v).sort(
+        (a, b) => imgRank(b) - imgRank(a)
+      );
+      for (const k of keys) { const r = walk(v[k], depth + 1); if (r) return r; }
+    }
+    return null;
+  };
+  return walk(node, 0);
+}
+function imgRank(k) { return /(photo|image|img|thumb|picture)/i.test(k) ? 1 : 0; }
+
+/* Debug: return the raw first product object + its top-level keys, so the
+   exact photo field can be identified. Reached via ?debug=1. */
+async function rapidRaw(q, env) {
+  if (!env.RAPIDAPI_KEY) throw new Error("RAPIDAPI_KEY not set");
+  const host = env.RAPIDAPI_HOST || "real-time-product-search.p.rapidapi.com";
+  const url = `https://${host}/search?q=${encodeURIComponent(q)}&country=us&limit=1`;
+  const r = await fetch(url, {
+    headers: { "X-RapidAPI-Key": env.RAPIDAPI_KEY, "X-RapidAPI-Host": host },
+  });
+  const d = await r.json();
+  const p = d?.data?.products?.[0] ?? d?.products?.[0] ?? null;
+  return { status: r.status, topKeys: d ? Object.keys(d) : [], productKeys: p ? Object.keys(p) : [], product: p };
 }
 
 /* ---- Best Buy Developer API (free key; needs a non-free-email account) ----
