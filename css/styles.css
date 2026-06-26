@@ -450,6 +450,7 @@ body {
   color: var(--text-3); font-size: 13px;
 }
 .footer .dot { opacity: .5; }
+.footer .version { font-variant-numeric: tabular-nums; opacity: .8; }
 
 /* install toast */
 .toast {

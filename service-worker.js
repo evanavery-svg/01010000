@@ -1,5 +1,5 @@
 /* Tracer service worker — offline-first for the app shell. */
-const VERSION = "tracer-v2";
+const VERSION = "tracer-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -47,7 +47,23 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Static assets: cache-first, then network (and cache the result).
+  const url = new URL(request.url);
+  const isCode = url.origin === location.origin && /\.(js|css)$/.test(url.pathname);
+
+  // App code (js/css): network-first so deploys always reach the user;
+  // fall back to cache only when offline. Prevents stale-bundle bugs.
+  if (isCode) {
+    e.respondWith(
+      fetch(request).then((res) => {
+        const copy = res.clone();
+        caches.open(VERSION).then((c) => c.put(request, copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Other static assets (icons, manifest): cache-first, then network.
   e.respondWith(
     caches.match(request).then((hit) =>
       hit ||

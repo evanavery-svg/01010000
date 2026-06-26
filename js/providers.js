@@ -47,7 +47,7 @@ async function fetchProxy(query, signal) {
   const headers = { Accept: "application/json" };
   if (CONFIG.apiKey) headers.Authorization = `Bearer ${CONFIG.apiKey}`;
 
-  const res = await fetch(url, { headers, signal });
+  const res = await fetch(url, { headers, signal, cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
   if (json && json.error) throw new Error(json.error);
