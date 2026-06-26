@@ -494,6 +494,15 @@ if (initial) { input.value = initial; run(initial); }
 
 /* ---------------- PWA: service worker + install ---------------- */
 if ("serviceWorker" in navigator) {
+  // Auto-reload once when a new version takes control of the page.
+  // Guard against the first install (no prior controller) and reload loops.
+  let refreshing = false;
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing || !hadController) return;
+    refreshing = true;
+    location.reload();
+  });
   addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
 }
 let deferredPrompt = null;
