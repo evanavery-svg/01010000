@@ -80,11 +80,21 @@ export function parseQuery(input) {
  * Deterministic set of retailer offers around the current price.
  * Buy links are real searches so they always work.
  */
-export function buildOffers(parsed, currentPrice, seed) {
+export function buildOffers(parsed, currentPrice, seed, real = {}) {
   const rnd = mulberry32((seed ^ hashStr("retail")) >>> 0);
   const q = encodeURIComponent(parsed.title);
 
   const offers = CONFIG.retailers.map((r, i) => {
+    // A real, live price for this retailer (e.g. eBay) overrides the estimate.
+    const live = real[r.name];
+    if (live && Number.isFinite(live.price)) {
+      return {
+        name: r.name, color: r.color, price: live.price, inStock: true, live: true,
+        shipping: live.condition ? `${live.condition} · live` : "Live listing",
+        url: live.url || (r.search + q),
+        sourceMatch: false,
+      };
+    }
     // spread roughly -6%..+9% around current; some retailers run cheaper
     const skew = (rnd() - 0.45) * 0.15;
     const price = Math.round(currentPrice * (1 + skew) * 100) / 100;

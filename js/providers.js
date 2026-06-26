@@ -63,6 +63,7 @@ async function fetchProxy(query, signal) {
         series, category: json.category || "Product",
         base: series[0].price, seed: hashStr(query), source: SOURCE.LIVE,
         retailer: json.retailer || null, image: json.image || null,
+        ebay: json.ebay || null, rating: json.rating ?? null, reviews: json.reviews ?? null,
       };
     }
   }
@@ -77,6 +78,7 @@ async function fetchProxy(query, signal) {
       base: modeled.base, seed: modeled.seed, source: SOURCE.LIVE_CURRENT,
       retailer: json.retailer || null, currentReal: current,
       image: json.image || null,
+      ebay: json.ebay || null, rating: json.rating ?? null, reviews: json.reviews ?? null,
     };
   }
 
@@ -99,4 +101,22 @@ export async function getPriceData(parsed, opts = {}) {
     }
   }
   return { ...generateSeries(query), source: SOURCE.ESTIMATE };
+}
+
+/**
+ * Resolve a scanned barcode (UPC/EAN) to a product name via the proxy.
+ * @param {string} code digits from the scanned barcode
+ * @returns {Promise<{title:string, brand?:string, image?:string, category?:string}>}
+ */
+export async function lookupBarcode(code) {
+  const base = effectiveApiBase();
+  if (!base) throw new Error("Barcode lookup needs a live data source (set apiBase).");
+  const b = base.replace(/\/+$/, "");
+  const url = `${b}${b.includes("?") ? "&" : "?"}barcode=${encodeURIComponent(code)}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  if (json && json.error) throw new Error(json.error);
+  if (!json.title) throw new Error("No product found for that barcode.");
+  return json;
 }

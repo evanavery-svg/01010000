@@ -2,7 +2,7 @@
    Tracer — app orchestrator (ES module entry).
    ============================================================ */
 import { fmt, pct, pct1, escapeHtml, dateShort } from "./util.js";
-import { getPriceData, isLive, SOURCE } from "./providers.js";
+import { getPriceData, isLive, SOURCE, lookupBarcode } from "./providers.js";
 import { generateSeries } from "./model.js";
 import { parseQuery, buildOffers } from "./retailers.js";
 import { computeStats, dealScore, forecast, buildVerdict } from "./insights.js";
@@ -84,7 +84,7 @@ function draw() {
   const verdict = buildVerdict(stats, deal, fc);
   state.stats = stats; state.deal = deal; state.fc = fc;
 
-  const offers = buildOffers(parsed, stats.current.price, data.seed);
+  const offers = buildOffers(parsed, stats.current.price, data.seed, data.ebay ? { eBay: data.ebay } : {});
   const cheapest = offers.find((o) => o.best);
   const title = parsed.title;
 
@@ -118,7 +118,7 @@ function draw() {
       <div class="item-id">
         <span class="verdict ${verdict.cls}"><span class="pulse"></span>${verdict.label}</span>
         <h2 class="item-name">${escapeHtml(title)}</h2>
-        <p class="item-sub">${escapeHtml(data.category)} ${sourceBadge} ${fromBadge}</p>
+        <p class="item-sub">${escapeHtml(data.category)} ${data.rating ? `<span class="rating">★ ${data.rating}${data.reviews ? ` · ${fmtCount(data.reviews)}` : ""}</span>` : ""} ${sourceBadge} ${fromBadge}</p>
       </div>
       <div class="price-now">
         <span class="label">Current price</span>
@@ -174,7 +174,9 @@ function draw() {
       <div class="offers">
         ${offers.map((o) => offerRow(o, cheapest.price)).join("")}
       </div>
-      <p class="compare-note">Prices are indicative; tap a retailer to see its live listing.</p>
+      <p class="compare-note">${offers.some((o) => o.live)
+        ? `Rows tagged <span class="tag live">live</span> are real listings; the rest are indicative.`
+        : "Prices are indicative; tap a retailer to see its live listing."}</p>
     </div>
   `;
 
@@ -229,6 +231,10 @@ function stat(cls, k, v, meta) {
   return `<div class="card stat ${cls}"><div class="k">${k}</div><div class="v">${v}</div><div class="meta">${meta}</div></div>`;
 }
 
+function fmtCount(n) {
+  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k reviews` : `${n} reviews`;
+}
+
 function scoreGauge(deal) {
   const R = 30, C = 2 * Math.PI * R;
   const off = C * (1 - deal.score / 100);
@@ -252,7 +258,7 @@ function offerRow(o, bestPrice) {
   return `<a class="offer ${o.best ? "best" : ""} ${o.inStock ? "" : "oos"}" href="${o.url}" target="_blank" rel="noopener">
     <span class="r-badge" style="--rc:${o.color}">${escapeHtml(o.name[0])}</span>
     <span class="r-main">
-      <span class="r-name">${escapeHtml(o.name)} ${o.best ? `<span class="tag">Best price</span>` : ""}</span>
+      <span class="r-name">${escapeHtml(o.name)} ${o.best ? `<span class="tag">Best price</span>` : ""} ${o.live ? `<span class="tag live">live</span>` : ""}</span>
       <span class="r-sub">${o.inStock ? o.shipping : "Out of stock"}</span>
     </span>
     <span class="r-price">
@@ -494,6 +500,74 @@ buildAcPool();
 renderDeals();
 const initial = decodeURIComponent(location.hash.replace(/^#/, "")).trim();
 if (initial) { input.value = initial; run(initial); }
+
+/* ---------------- Barcode scanning (UPCitemdb) ---------------- */
+const scanBtn = $("#scanBtn");
+const scanner = $("#scanner");
+let scanStream = null, scanRAF = 0, detector = null;
+
+function scanCameraSupported() {
+  return "BarcodeDetector" in window && !!navigator.mediaDevices?.getUserMedia;
+}
+
+async function openScanner() {
+  if (!scanCameraSupported()) return manualBarcode();
+  try {
+    detector = detector || new window.BarcodeDetector({
+      formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"],
+    });
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    const v = $("#scanVideo");
+    v.srcObject = scanStream;
+    await v.play();
+    scanner.hidden = false;
+    document.body.style.overflow = "hidden";
+    scanLoop(v);
+  } catch {
+    closeScanner();
+    manualBarcode();
+  }
+}
+async function scanLoop(v) {
+  if (scanner.hidden) return;
+  try {
+    const codes = await detector.detect(v);
+    const hit = codes.find((c) => /^[0-9]{8,14}$/.test(c.rawValue));
+    if (hit) return onBarcode(hit.rawValue);
+  } catch { /* transient detect error — keep scanning */ }
+  scanRAF = requestAnimationFrame(() => scanLoop(v));
+}
+function closeScanner() {
+  scanner.hidden = true;
+  document.body.style.overflow = "";
+  cancelAnimationFrame(scanRAF);
+  if (scanStream) { scanStream.getTracks().forEach((t) => t.stop()); scanStream = null; }
+}
+function manualBarcode() {
+  const code = prompt("Enter the barcode number (UPC / EAN):");
+  if (code && /[0-9]{8,}/.test(code)) onBarcode(code.replace(/[^0-9]/g, ""));
+}
+async function onBarcode(code) {
+  closeScanner();
+  const prev = input.value;
+  input.value = "Looking up barcode…";
+  try {
+    const prod = await lookupBarcode(code);
+    input.value = prod.title;
+    run(prod.title);
+    scrollToResult();
+  } catch (err) {
+    input.value = prev;
+    alert(err.message || "Couldn't find that product.");
+  }
+}
+if (scanBtn && isLive()) {
+  scanBtn.hidden = false;
+  scanBtn.addEventListener("click", openScanner);
+  scanner.querySelector(".scanner-close").addEventListener("click", closeScanner);
+  scanner.addEventListener("click", (e) => { if (e.target === scanner) closeScanner(); });
+  addEventListener("keydown", (e) => { if (e.key === "Escape" && !scanner.hidden) closeScanner(); });
+}
 
 /* ---------------- PWA: service worker + install ---------------- */
 if ("serviceWorker" in navigator) {

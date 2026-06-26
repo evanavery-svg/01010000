@@ -57,6 +57,12 @@
         <input id="searchInput" name="q" type="text" inputmode="search"
                placeholder="Search an item or paste a product link" aria-label="Item or product link to check"
                role="combobox" aria-expanded="false" aria-controls="autocomplete" aria-autocomplete="list" />
+        <button id="scanBtn" class="scan-btn" type="button" aria-label="Scan a barcode" title="Scan a barcode" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+            <path d="M7 8v8M10 8v8M13 8v8M17 8v8"/>
+          </svg>
+        </button>
         <button class="search-btn" type="submit">
           <span class="search-btn-label">Check</span>
           <svg class="search-btn-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -84,11 +90,26 @@
     <span class="dot">·</span>
     <span>Installable · works offline</span>
     <span class="dot">·</span>
-    <span class="version">v1.5.0</span>
+    <span class="version">v1.6.0</span>
   </footer>
 
   <!-- Hover tooltip lives at body level so it can overflow the chart card -->
   <div id="tooltip" class="tooltip" hidden></div>
+
+  <!-- Barcode scanner overlay -->
+  <div id="scanner" class="scanner" hidden role="dialog" aria-modal="true" aria-label="Barcode scanner">
+    <div class="scanner-card">
+      <div class="scanner-head">
+        <span>Scan a barcode</span>
+        <button class="scanner-close" type="button" aria-label="Close scanner">&times;</button>
+      </div>
+      <div class="scanner-view">
+        <video id="scanVideo" playsinline muted></video>
+        <div class="scanner-frame" aria-hidden="true"></div>
+      </div>
+      <p class="scanner-hint">Point your camera at a product barcode</p>
+    </div>
+  </div>
 
   <script type="module" src="./js/app.js"></script>
 </body>

@@ -13,12 +13,24 @@ Browser (Tracer)  ──GET ?q=airpods──►  Worker (holds key)  ──►  
 
 ## What you need
 
-A free price API key. Two options:
+At minimum, one **price provider** key. You can also enable two optional
+**enrichers** (real eBay price + barcode scanning) — each works independently
+and degrades gracefully if its key is missing.
 
-| Provider | Cost | Gmail OK? | Notes |
-|---|---|---|---|
-| **RapidAPI – Real-Time Product Search** | Free tier | ✅ Yes | Recommended. Current prices across retailers. |
-| **Best Buy Developer API** | Free | ❌ No (needs a work/edu email) | US Best Buy catalog only. |
+### Price providers (pick one — set with `PROVIDER`)
+
+| Provider | `PROVIDER` | Cost | Gmail OK? | Notes |
+|---|---|---|---|---|
+| **RapidAPI – Real-Time Product Search** | `rapid` (default) | Free tier | ✅ | Recommended. Current prices + image. |
+| **SerpApi – Google Shopping** | `serp` | 100/mo free | ✅ | Clean data incl. rating/reviews. |
+| **Best Buy Developer API** | `bestbuy` | Free | ❌ (needs work/edu email) | US Best Buy catalog only. |
+
+### Optional enrichers (set the keys to turn on)
+
+| Feature | Keys | Cost | Gmail OK? | What it adds |
+|---|---|---|---|---|
+| **eBay Browse** | `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET` | Free | ✅ | A real eBay market price in *Compare retailers* (tagged **live**). |
+| **UPCitemdb barcode** | none (trial) or `UPCDB_KEY` | Free trial | ✅ | Phone-camera barcode scanning → product search. |
 
 The worker returns the **current** price. Tracer shows that real price as the
 headline and anchors an *estimated* trend line to it (clearly labelled). For a
@@ -44,6 +56,15 @@ wrangler deploy
 `wrangler deploy` prints a URL like
 `https://tracer-price-proxy.<you>.workers.dev`.
 
+### SerpApi instead
+
+In `wrangler.toml` set `PROVIDER = "serp"`, then:
+
+```bash
+wrangler secret put SERPAPI_KEY   # from serpapi.com
+wrangler deploy
+```
+
 ### Best Buy instead
 
 In `wrangler.toml` set `PROVIDER = "bestbuy"`, then:
@@ -52,6 +73,35 @@ In `wrangler.toml` set `PROVIDER = "bestbuy"`, then:
 wrangler secret put BESTBUY_KEY
 wrangler deploy
 ```
+
+### Add real eBay prices (optional)
+
+Create a free app at [developer.ebay.com](https://developer.ebay.com) and copy
+your **Production** App ID (Client ID) and Cert ID (Client Secret):
+
+```bash
+wrangler secret put EBAY_CLIENT_ID
+wrangler secret put EBAY_CLIENT_SECRET
+wrangler deploy
+```
+
+eBay's real price then appears in *Compare retailers*, tagged **live**, with a
+link to the actual listing. No `PROVIDER` change needed — it runs alongside
+whichever price provider you chose.
+
+### Add barcode scanning (optional)
+
+Works out of the box on the free trial (rate-limited). For higher limits, get a
+key at [upcitemdb.com](https://www.upcitemdb.com/api) and:
+
+```bash
+wrangler secret put UPCDB_KEY
+wrangler deploy
+```
+
+Then the camera/scan button in the search bar resolves a scanned barcode to a
+product and searches it. (On browsers without the camera Barcode API — e.g.
+iOS Safari — it falls back to typing the number.)
 
 ## Point Tracer at it
 
