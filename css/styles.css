@@ -628,10 +628,39 @@ body {
 /* ---------------- Responsive ---------------- */
 @media (max-width: 680px) {
   .stats { grid-template-columns: repeat(2, 1fr); }
-  .item-head { flex-direction: column; }
-  .price-now { align-items: flex-start; }
-  .gauge { flex-direction: row; width: auto; align-items: center; gap: 12px; align-self: flex-start; }
+
+  /* Result header — base (no image): a clean content-height stack.
+     flex:0 0 auto kills the 240px flex-basis gap from the desktop layout. */
+  .item-head { flex-direction: column; align-items: stretch; gap: 16px; }
+  .item-id { flex: 0 0 auto; }
+  .price-now {
+    align-items: flex-start; min-width: 0; width: 100%;
+    padding-top: 16px; border-top: 1px solid var(--stroke);
+  }
+  .gauge { flex-direction: row; width: auto; align-items: center; gap: 14px; align-self: flex-start; }
   .gauge .g-label { margin-top: 0; }
+
+  /* tighten the title block so name/sub sit close together */
+  .verdict { margin-bottom: 8px; }
+  .item-name { margin-bottom: 2px; }
+
+  /* With a product image: thumbnail beside the title, price + gauge below. */
+  .item-head:has(.prod-img-wrap) {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "img  id"
+      "price price"
+      "gauge gauge";
+    align-items: center;
+  }
+  .item-head:has(.prod-img-wrap) .prod-img-wrap {
+    grid-area: img; align-self: center; width: 64px; height: 64px;
+  }
+  .item-head:has(.prod-img-wrap) .item-id { grid-area: id; align-self: center; }
+  .item-head:has(.prod-img-wrap) .price-now { grid-area: price; }
+  .item-head:has(.prod-img-wrap) .gauge { grid-area: gauge; }
+
   .search-btn-label { display: none; }
   .search-btn { padding: 13px; }
   .chart-foot { gap: 14px; }

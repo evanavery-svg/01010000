@@ -1,5 +1,5 @@
 /* Tracer service worker — offline-first for the app shell. */
-const VERSION = "tracer-v4";
+const VERSION = "tracer-v5";
 const ASSETS = [
   "./",
   "./index.html",
