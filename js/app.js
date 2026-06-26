@@ -230,17 +230,20 @@ function stat(cls, k, v, meta) {
 }
 
 function scoreGauge(deal) {
-  const R = 26, C = 2 * Math.PI * R;
+  const R = 30, C = 2 * Math.PI * R;
   const off = C * (1 - deal.score / 100);
-  return `<div class="gauge ${deal.cls}" title="Deal score ${deal.score}/100">
+  return `<div class="gauge ${deal.cls}" title="Deal score ${deal.score} out of 100">
     <div class="g-ring">
-      <svg viewBox="0 0 64 64" aria-hidden="true">
-        <circle cx="32" cy="32" r="${R}" class="g-track"/>
-        <circle cx="32" cy="32" r="${R}" class="g-val" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 32 32)"/>
+      <svg viewBox="0 0 76 76" aria-hidden="true">
+        <circle cx="38" cy="38" r="${R}" class="g-track"/>
+        <circle cx="38" cy="38" r="${R}" class="g-val" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 38 38)"/>
       </svg>
-      <div class="g-num">${deal.score}<small>/100</small></div>
+      <div class="g-num">${deal.score}</div>
     </div>
-    <div class="g-label">${deal.label}</div>
+    <div class="g-meta">
+      <span class="g-label">${deal.label}</span>
+      <span class="g-cap">Deal score · ${deal.score}/100</span>
+    </div>
   </div>`;
 }
 

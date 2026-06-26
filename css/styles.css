@@ -131,23 +131,41 @@ body {
 }
 
 /* ---------------- Hero ---------------- */
-.hero { text-align: center; animation: rise .7s var(--ease) both; }
-.eyebrow {
-  font-size: 12px; letter-spacing: .22em; font-weight: 650;
-  color: var(--orange); margin: 0 0 14px;
+.hero {
+  text-align: center;
+  padding: clamp(24px, 8vh, 84px) 0 clamp(20px, 5vh, 44px);
+}
+/* Staggered, snappy entrance for each hero element */
+.hero > * { animation: rise .55s var(--ease) both; }
+.hero .quote    { animation-delay: .02s; }
+.hero .headline { animation-delay: .09s; }
+.hero .subhead  { animation-delay: .16s; }
+.hero .search   { animation-delay: .23s; }
+.hero .suggests { animation-delay: .30s; }
+
+.quote {
+  font-size: clamp(13px, 2vw, 15px);
+  font-weight: 500; color: var(--text-3);
+  letter-spacing: -.01em; margin: 0 0 18px;
 }
 .headline {
-  font-size: clamp(38px, 8vw, 68px);
-  line-height: 1.02;
-  letter-spacing: -.035em;
+  font-size: clamp(40px, 8.5vw, 72px);
+  line-height: 1.0;
+  letter-spacing: -.04em;
   font-weight: 700;
-  margin: 0 0 16px;
+  margin: 0 0 18px;
 }
-.headline .accent { color: var(--orange); }
+.headline .accent {
+  color: var(--orange);
+  background: linear-gradient(120deg, var(--orange-soft), var(--orange-deep));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 .subhead {
-  max-width: 540px; margin: 0 auto;
+  max-width: 480px; margin: 0 auto;
   color: var(--text-2);
-  font-size: clamp(15px, 2.4vw, 18px);
+  font-size: clamp(15px, 2.4vw, 17px);
+  line-height: 1.5;
 }
 
 /* ---------------- Search ---------------- */
@@ -165,6 +183,7 @@ body {
 .search:focus-within {
   border-color: color-mix(in srgb, var(--orange) 55%, transparent);
   box-shadow: var(--shadow), 0 0 0 4px rgba(255,106,0,.14);
+  transform: translateY(-2px);
 }
 .search-ico { display: grid; place-items: center; color: var(--text-3); }
 .search-ico svg { width: 21px; height: 21px; }
@@ -523,21 +542,25 @@ body {
 }
 
 /* ---------------- Deal-score gauge ---------------- */
-.gauge { width: 96px; flex: none; display: flex; flex-direction: column; align-items: center; }
-.g-ring { position: relative; width: 64px; height: 64px; }
-.gauge svg { width: 64px; height: 64px; display: block; }
+.gauge { flex: none; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.g-ring { position: relative; width: 76px; height: 76px; }
+.gauge svg { width: 76px; height: 76px; display: block; }
 .g-track { fill: none; stroke: var(--stroke); stroke-width: 6; }
-.g-val { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s var(--ease); }
+.g-val { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1.1s var(--ease); }
 .gauge.buy .g-val { stroke: #34c759; }
 .gauge.fair .g-val { stroke: var(--orange); }
 .gauge.wait .g-val { stroke: #ff5a5a; }
 .g-num {
   position: absolute; inset: 0;
   display: grid; place-items: center;
-  font-weight: 720; font-size: 19px; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+  font-weight: 740; font-size: 24px; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
 }
-.g-num small { font-size: 10px; color: var(--text-3); font-weight: 600; margin-left: 1px; }
-.g-label { font-size: 11.5px; color: var(--text-2); margin-top: 5px; text-align: center; line-height: 1.2; }
+.g-meta { display: flex; flex-direction: column; align-items: center; gap: 1px; text-align: center; }
+.g-label { font-size: 13px; font-weight: 650; letter-spacing: -.01em; }
+.gauge.buy  .g-label { color: #1fb255; }
+.gauge.fair .g-label { color: var(--orange); }
+.gauge.wait .g-label { color: #ff5a5a; }
+.g-cap { font-size: 10.5px; color: var(--text-3); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
 
 /* ---------------- Chart footer (legend + actions) ---------------- */
 .chart-foot {
@@ -609,7 +632,14 @@ body {
   padding: 16px; display: flex; flex-direction: column; gap: 11px;
   transition: transform .2s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease);
 }
-.deal-card:hover { transform: translateY(-3px); border-color: var(--stroke-strong); }
+.deal-card { animation: rise .5s var(--ease) both; }
+.deal-card:nth-child(1) { animation-delay: .04s; }
+.deal-card:nth-child(2) { animation-delay: .09s; }
+.deal-card:nth-child(3) { animation-delay: .14s; }
+.deal-card:nth-child(4) { animation-delay: .19s; }
+.deal-card:nth-child(5) { animation-delay: .24s; }
+.deal-card:nth-child(6) { animation-delay: .29s; }
+.deal-card:hover { transform: translateY(-3px); border-color: var(--stroke-strong); box-shadow: var(--shadow); }
 .deal-card:active { transform: translateY(-1px) scale(.99); }
 .deal-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .deal-name { font-weight: 630; font-size: 15px; letter-spacing: -.01em; }
@@ -638,7 +668,7 @@ body {
     padding-top: 16px; border-top: 1px solid var(--stroke);
   }
   .gauge { flex-direction: row; width: auto; align-items: center; gap: 14px; align-self: flex-start; }
-  .gauge .g-label { margin-top: 0; }
+  .gauge .g-meta { align-items: flex-start; text-align: left; }
 
   /* tighten the title block so name/sub sit close together */
   .verdict { margin-bottom: 8px; }
