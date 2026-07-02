@@ -8,6 +8,10 @@ import { parseQuery, buildOffers } from "./retailers.js";
 import { computeStats, dealScore, forecast, buildVerdict } from "./insights.js";
 import { drawChart, sparkline } from "./chart.js";
 import { shareItem, exportCSV, exportPNG } from "./exporters.js";
+import {
+  getWatchlist, getWatch, isWatched, addWatch, removeWatch, setTarget,
+  updateWatch, recordPrice, getRecorded,
+} from "./watch.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 
@@ -54,9 +58,18 @@ async function run(rawInput) {
   if (token !== fetchToken) return; // a newer search superseded this one
 
   state = { parsed, data };
+
+  // Real price seen → remember it (chart dots) and refresh the watchlist entry.
+  const cur = data.series[data.series.length - 1]?.price;
+  if (data.source !== SOURCE.ESTIMATE && Number.isFinite(cur)) {
+    recordPrice(parsed.title, cur);
+    updateWatch(parsed.title, cur, data.image ?? null, true);
+  }
+
   draw();
   location.hash = encodeURIComponent(parsed.title);
   pushRecent(parsed.title, state.stats?.current?.price ?? null, data.source, data.image ?? null);
+  renderWatchlist();
 }
 
 function showSkeleton(parsed) {
@@ -88,6 +101,17 @@ function draw() {
   const cheapest = offers.find((o) => o.best);
   const title = parsed.title;
 
+  const liveSrc = data.source !== SOURCE.ESTIMATE;
+  const watched = getWatch(title);
+  const recorded = liveSrc
+    ? getRecorded(title).filter((m) => m.t >= series[0].t)
+    : [];
+  const hitBanner = watched && liveSrc && stats.current.price <= watched.target
+    ? `<div class="card notice hit reveal d1">${ICON.target}
+        <p><strong>Target hit!</strong> ${escapeHtml(title)} is at ${fmt.format(stats.current.price)} —
+        at or below your ${fmt.format(watched.target)} target.</p></div>`
+    : "";
+
   let sourceBadge, notice = "";
   if (data.source === SOURCE.LIVE) {
     sourceBadge = `<span class="src live">● Live</span>`;
@@ -112,11 +136,14 @@ function draw() {
     : "";
 
   resultEl.innerHTML = `
-    ${notice}
+    ${notice}${hitBanner}
     <div class="card item-head reveal d1">
       ${imgHtml}
       <div class="item-id">
-        <span class="verdict ${verdict.cls}"><span class="pulse"></span>${verdict.label}</span>
+        <div class="id-top">
+          <span class="verdict ${verdict.cls}"><span class="pulse"></span>${verdict.label}</span>
+          ${watchBtnHtml(watched)}
+        </div>
         <h2 class="item-name">${escapeHtml(title)}</h2>
         <p class="item-sub">${escapeHtml(data.category)} ${data.rating ? `<span class="rating">★ ${data.rating}${data.reviews ? ` · ${fmtCount(data.reviews)}` : ""}</span>` : ""} ${sourceBadge} ${fromBadge}</p>
       </div>
@@ -139,7 +166,7 @@ function draw() {
       <div class="chart-head">
         <div class="chart-title">Price history <span>· ${fmt.format(stats.lo.price)}–${fmt.format(stats.hi.price)}</span></div>
         <div class="range" role="tablist" aria-label="Time range">
-          ${[["3M", 90], ["6M", 180], ["1Y", 365]].map(([l, d]) =>
+          ${[["1M", 30], ["3M", 90], ["6M", 180], ["1Y", 365]].map(([l, d]) =>
             `<button type="button" data-days="${d}" class="${d === activeRange ? "on" : ""}">${l}</button>`).join("")}
         </div>
       </div>
@@ -149,6 +176,7 @@ function draw() {
           <span><i class="sw line"></i>Price</span>
           <span><i class="sw avg"></i>Average</span>
           ${activeRange === 365 && fc ? `<span><i class="sw proj"></i>Forecast</span>` : ""}
+          ${recorded.length ? `<span title="Prices Tracer has actually seen for this item"><i class="sw markdot"></i>${recorded.length} real price${recorded.length > 1 ? "s" : ""} recorded</span>` : ""}
         </div>
         <div class="actions">
           <button class="act" data-act="share" type="button" title="Share">${ICON.share}<span>Share</span></button>
@@ -184,6 +212,7 @@ function draw() {
   drawChart($("#chartWrap"), series, stats, {
     tooltip,
     projection: activeRange === 365 && fc ? fc.projection : null,
+    marks: recorded,
   });
 
   // range toggles
@@ -193,6 +222,105 @@ function draw() {
   // export / share actions
   resultEl.querySelectorAll(".act").forEach((b) =>
     b.addEventListener("click", () => handleAction(b)));
+
+  bindWatchBtn();
+}
+
+/* ---------------- Watchlist ---------------- */
+function watchBtnHtml(w) {
+  return `<button class="watch-btn ${w ? "on" : ""}" type="button" aria-pressed="${w ? "true" : "false"}"
+    title="${w ? "Stop watching this item" : "Watch this item — you'll see a target-hit alert when it drops"}">
+    ${ICON.star}<span>${w ? "Watching" : "Watch"}</span>
+  </button>`;
+}
+
+function bindWatchBtn() {
+  const btn = resultEl.querySelector(".watch-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const { parsed, data, stats } = state;
+    if (isWatched(parsed.title)) removeWatch(parsed.title);
+    else addWatch(parsed.title, stats.current.price, data.image ?? null, data.source !== SOURCE.ESTIMATE);
+    btn.outerHTML = watchBtnHtml(getWatch(parsed.title));
+    bindWatchBtn();
+    renderWatchlist();
+  }, { once: true });
+}
+
+function renderWatchlist() {
+  const host = $("#watchlist");
+  if (!host) return;
+  const list = getWatchlist();
+  if (!list.length) { host.hidden = true; host.innerHTML = ""; return; }
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="watch-head">
+      <h2>Watchlist</h2>
+      <p>Tap a target to edit it — a card turns green when the price is at or below your target.</p>
+    </div>
+    <div class="watch-grid">
+      ${list.map((w) => {
+        const hit = w.price != null && w.price <= w.target;
+        return `<div class="watch-card ${hit ? "hit" : ""}" data-q="${escapeHtml(w.q)}">
+          <button class="wc-open" type="button" title="Check current price">
+            ${w.image
+              ? `<img class="rc-img" src="${escapeHtml(w.image)}" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">`
+              : `<span class="rc-ico">${ICON.star}</span>`}
+            <span class="wc-main">
+              <span class="wc-name">${escapeHtml(w.q)}</span>
+              <span class="wc-price">${w.price != null
+                ? `${fmt.format(w.price)}${w.live ? ` · <span class="rc-live">live</span>` : ""}`
+                : "Tap to check"}</span>
+            </span>
+          </button>
+          <div class="wc-side">
+            <button class="wc-target" type="button" title="Edit target price">${ICON.target}<span>${fmt.format(w.target)}</span></button>
+            <span class="wc-status ${hit ? "ok" : ""}">${hit ? "Below target" : "Watching"}</span>
+          </div>
+          <button class="wc-remove" type="button" aria-label="Remove ${escapeHtml(w.q)} from watchlist">×</button>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  host.querySelectorAll(".watch-card").forEach((card) => {
+    const q = card.dataset.q;
+    card.querySelector(".wc-open").addEventListener("click", () => {
+      input.value = q; run(q); scrollToResult();
+    });
+    card.querySelector(".wc-remove").addEventListener("click", () => {
+      removeWatch(q);
+      renderWatchlist();
+      // keep the result header's watch button in sync if it's the same item
+      if (state && state.parsed.title.toLowerCase() === q.toLowerCase()) {
+        const b = resultEl.querySelector(".watch-btn");
+        if (b) { b.outerHTML = watchBtnHtml(null); bindWatchBtn(); }
+      }
+    });
+    card.querySelector(".wc-target").addEventListener("click", () => beginTargetEdit(card, q));
+  });
+}
+
+function beginTargetEdit(card, q) {
+  const w = getWatch(q);
+  const chip = card.querySelector(".wc-target");
+  if (!w || chip.classList.contains("editing")) return;
+  chip.classList.add("editing");
+  chip.innerHTML = `<input class="wc-input" type="number" inputmode="decimal" step="0.01" min="0"
+    value="${w.target}" aria-label="Target price for ${escapeHtml(q)}">`;
+  const inp = chip.querySelector("input");
+  inp.focus(); inp.select();
+  let done = false;
+  const commit = () => {
+    if (done) return; done = true;
+    const v = parseFloat(inp.value);
+    if (Number.isFinite(v) && v > 0) setTarget(q, Math.round(v * 100) / 100);
+    renderWatchlist();
+  };
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") inp.blur();
+    else if (e.key === "Escape") { done = true; renderWatchlist(); }
+  });
+  inp.addEventListener("blur", commit);
 }
 
 async function handleAction(btn) {
@@ -278,6 +406,8 @@ const ICON = {
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></svg>`,
   clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
   trend: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 7-7"/><path d="M21 8V5h-3"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.9l6.1-.9z"/></svg>`,
+  target: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>`,
 };
 
 /* ---------------- Feature 7: deal feed ---------------- */
@@ -487,6 +617,16 @@ input.addEventListener("keydown", (e) => {
   else if (e.key === "Escape") { hideAc(); }
 });
 document.addEventListener("click", (e) => { if (!e.target.closest(".search")) hideAc(); });
+
+// Press "/" anywhere to jump to search (like GitHub/YouTube).
+addEventListener("keydown", (e) => {
+  if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+  const a = document.activeElement;
+  if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable)) return;
+  e.preventDefault();
+  input.focus();
+  input.select();
+});
 window.addEventListener("hashchange", () => {
   const h = decodeURIComponent(location.hash.replace(/^#/, "")).trim();
   if (h && (!state || state.parsed.title.toLowerCase() !== h.toLowerCase())) { input.value = h; run(h); }
@@ -496,6 +636,7 @@ if (isLive()) $(".data-note")?.setAttribute("hidden", "");
 
 renderSuggests();
 renderRecent();
+renderWatchlist();
 buildAcPool();
 renderDeals();
 const initial = decodeURIComponent(location.hash.replace(/^#/, "")).trim();

@@ -1,5 +1,5 @@
 /* Tracer service worker — offline-first for the app shell. */
-const VERSION = "tracer-v7";
+const VERSION = "tracer-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,6 +13,7 @@ const ASSETS = [
   "./js/insights.js",
   "./js/chart.js",
   "./js/exporters.js",
+  "./js/watch.js",
   "./manifest.webmanifest",
   "./favicon.svg",
   "./icons/icon-192.png",

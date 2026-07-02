@@ -51,7 +51,13 @@ export function renderChartSVG(series, stats, opts = {}) {
   const tMin = Math.min(...allT), tMax = Math.max(...allT);
   const tSpan = Math.max(1, tMax - tMin);
 
-  const allP = series.map((p) => p.price).concat(proj ? proj.map((p) => p.price) : []);
+  // Real recorded prices shown as dots on top of the (possibly estimated) line.
+  const marks = (opts.marks || []).filter((m) =>
+    Number.isFinite(m.t) && Number.isFinite(m.price) && m.t >= tMin && m.t <= tMax);
+
+  const allP = series.map((p) => p.price)
+    .concat(proj ? proj.map((p) => p.price) : [])
+    .concat(marks.map((m) => m.price));
   let min = Math.min(...allP), max = Math.max(...allP);
   const padV = (max - min) * 0.18 || max * 0.1;
   min -= padV; max += padV;
@@ -109,6 +115,8 @@ export function renderChartSVG(series, stats, opts = {}) {
       <line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padR}" y2="${avgY.toFixed(1)}" stroke="${c.avg}" stroke-width="1.2" stroke-dasharray="4 5" opacity="0.7"/>
       <path class="price-line" d="${line}" fill="none" stroke="${c.line}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       ${projPath}${xlab}
+      ${marks.map((m) =>
+        `<circle cx="${X(m.t).toFixed(1)}" cy="${Y(m.price).toFixed(1)}" r="3.4" fill="${c.line}" stroke="${c.ring}" stroke-width="1.8"/>`).join("")}
       <circle cx="${X(stats.hi.t).toFixed(1)}" cy="${Y(stats.hi.price).toFixed(1)}" r="5" fill="${c.hi}" stroke="${c.ring}" stroke-width="2.5"/>
       <circle cx="${X(stats.lo.t).toFixed(1)}" cy="${Y(stats.lo.price).toFixed(1)}" r="5" fill="${c.lo}" stroke="${c.ring}" stroke-width="2.5"/>
       ${hover}

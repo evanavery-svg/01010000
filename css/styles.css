@@ -405,6 +405,23 @@ body {
 .delta.up { color: #ff5a5a; }
 .delta.down { color: #34c759; }
 
+/* verdict + watch row */
+.id-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+
+/* watch (star) button */
+.watch-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 13px; border-radius: 999px;
+  border: 1px solid var(--stroke); background: var(--chip);
+  color: var(--text-2); font-family: inherit; font-size: 13px; font-weight: 650;
+  cursor: pointer; transition: all .2s var(--ease);
+}
+.watch-btn svg { width: 15px; height: 15px; }
+.watch-btn:hover { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); transform: translateY(-1px); }
+.watch-btn:active { transform: scale(.96); }
+.watch-btn.on { color: var(--orange); background: rgba(255,106,0,.1); border-color: rgba(255,106,0,.35); }
+.watch-btn.on svg { fill: currentColor; }
+
 /* verdict badge */
 .verdict {
   display: inline-flex; align-items: center; gap: 7px;
@@ -580,6 +597,8 @@ body {
 .notice.warn svg { color: var(--orange); }
 .notice.info { border-color: var(--stroke); }
 .notice.info svg { color: var(--text-3); }
+.notice.hit { border-color: rgba(52,199,89,.4); background: rgba(52,199,89,.07); }
+.notice.hit svg { color: #1fb255; }
 
 .sample-tag {
   font-size: 11px; font-weight: 650; letter-spacing: .02em;
@@ -622,6 +641,7 @@ body {
 .sw.line { background: var(--orange); }
 .sw.avg { background: var(--text-3); }
 .sw.proj { height: 0; border-top: 2px dashed var(--orange-soft); width: 16px; }
+.sw.markdot { width: 8px; height: 8px; border-radius: 999px; background: var(--orange); border: 2px solid var(--bg); }
 .actions { display: flex; gap: 6px; }
 .act {
   display: inline-flex; align-items: center; gap: 6px;
@@ -668,6 +688,51 @@ body {
 .r-go { color: var(--text-3); display: grid; place-items: center; }
 .r-go svg { width: 18px; height: 18px; }
 .compare-note { margin: 13px 0 0; font-size: 12px; color: var(--text-3); }
+
+/* ---------------- Watchlist ---------------- */
+.watchlist { margin-top: clamp(40px, 7vw, 64px); position: relative; z-index: 1; }
+.watchlist[hidden] { display: none; }
+.watch-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 16px; }
+.watch-head h2 { font-size: clamp(20px, 3.5vw, 26px); letter-spacing: -.025em; margin: 0; font-weight: 700; }
+.watch-head p { margin: 0; color: var(--text-3); font-size: 12.5px; }
+.watch-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.watch-card {
+  position: relative; display: flex; flex-direction: column; gap: 11px;
+  padding: 14px 16px; border-radius: var(--radius-md);
+  background: var(--surface); border: 1px solid var(--stroke);
+  transition: transform .2s var(--ease), border-color .2s var(--ease);
+}
+.watch-card:hover { transform: translateY(-2px); border-color: var(--stroke-strong); }
+.watch-card.hit { border-color: rgba(52,199,89,.45); background: rgba(52,199,89,.06); }
+.wc-open {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  background: none; border: none; padding: 0 18px 0 0;
+  color: var(--text); font-family: inherit; cursor: pointer; min-width: 0;
+}
+.wc-main { flex: 1; min-width: 0; }
+.wc-name { display: block; font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wc-price { display: block; color: var(--text-2); font-size: 13px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.wc-side { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wc-target {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--stroke); background: var(--chip); color: var(--text-2);
+  border-radius: 999px; padding: 5px 11px;
+  font-size: 12.5px; font-weight: 600; font-family: inherit;
+  font-variant-numeric: tabular-nums; cursor: pointer; transition: all .2s var(--ease);
+}
+.wc-target:hover { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
+.wc-target svg { width: 14px; height: 14px; }
+.wc-input { width: 76px; border: none; outline: none; background: transparent; color: var(--text); font: inherit; font-variant-numeric: tabular-nums; }
+.wc-status { font-size: 12px; font-weight: 600; color: var(--text-3); }
+.wc-status.ok { color: #1fb255; }
+.wc-remove {
+  position: absolute; top: 8px; right: 10px;
+  border: none; background: transparent; color: var(--text-3);
+  font-size: 18px; line-height: 1; cursor: pointer;
+  padding: 2px 6px; border-radius: 8px; opacity: .6;
+  transition: opacity .2s var(--ease), color .2s var(--ease);
+}
+.wc-remove:hover { opacity: 1; color: var(--text); }
 
 /* ---------------- Deal feed ---------------- */
 .deals { margin-top: clamp(44px, 8vw, 76px); position: relative; z-index: 1; }
@@ -720,7 +785,7 @@ body {
   .gauge .g-meta { align-items: flex-start; text-align: left; }
 
   /* tighten the title block so name/sub sit close together */
-  .verdict { margin-bottom: 8px; }
+  .id-top { margin-bottom: 8px; }
   .item-name { margin-bottom: 2px; }
 
   /* With a product image: thumbnail beside the title, price + gauge below. */
