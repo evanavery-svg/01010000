@@ -1,5 +1,5 @@
 /* Tracer service worker — offline-first for the app shell. */
-const VERSION = "tracer-v8";
+const VERSION = "tracer-v9";
 const ASSETS = [
   "./",
   "./index.html",
@@ -49,7 +49,14 @@ self.addEventListener("fetch", (e) => {
   }
 
   const url = new URL(request.url);
-  const isCode = url.origin === location.origin && /\.(js|css)$/.test(url.pathname);
+
+  // Data, not app shell. The price proxy and barcode lookup are cross-origin
+  // and/or carry a query string; the shell never is. Leave these to the network
+  // entirely — a cached price is a wrong price, and caching one would freeze the
+  // "Live" badge on a stale number and poison the recorded price history.
+  if (url.origin !== location.origin || url.search) return;
+
+  const isCode = /\.(js|css)$/.test(url.pathname);
 
   // App code (js/css): network-first so deploys always reach the user;
   // fall back to cache only when offline. Prevents stale-bundle bugs.

@@ -47,13 +47,18 @@ export function renderChartSVG(series, stats, opts = {}) {
   const proj = opts.projection && opts.projection.length > 1 ? opts.projection : null;
   const gid = opts.gradientId || "areaGrad";
 
-  const allT = series.map((p) => p.t).concat(proj ? proj.map((p) => p.t) : []);
-  const tMin = Math.min(...allT), tMax = Math.max(...allT);
-  const tSpan = Math.max(1, tMax - tMin);
+  const baseT = series.map((p) => p.t).concat(proj ? proj.map((p) => p.t) : []);
+  const tMin = Math.min(...baseT);
 
   // Real recorded prices shown as dots on top of the (possibly estimated) line.
+  // Drop only what falls before the window: a recording is stamped with the
+  // wall-clock time it was seen, which lands past the last (midnight) sample,
+  // so tMax has to stretch to cover them or they would never draw at all.
   const marks = (opts.marks || []).filter((m) =>
-    Number.isFinite(m.t) && Number.isFinite(m.price) && m.t >= tMin && m.t <= tMax);
+    Number.isFinite(m.t) && Number.isFinite(m.price) && m.t >= tMin);
+
+  const tMax = Math.max(...baseT, ...marks.map((m) => m.t));
+  const tSpan = Math.max(1, tMax - tMin);
 
   const allP = series.map((p) => p.price)
     .concat(proj ? proj.map((p) => p.price) : [])

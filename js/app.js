@@ -90,14 +90,18 @@ function showSkeleton(parsed) {
 /* ---------------- Render ---------------- */
 function draw() {
   const { parsed, data } = state;
+  // The analysis is always year-scale; the range toggle only changes what's
+  // plotted. Deriving the verdict from the zoom window would let a 30-day low
+  // read as "near its lowest all year" while sitting near the yearly high.
+  const full = computeStats(data.series);
   const series = rangeSlice(data.series, activeRange);
-  const stats = computeStats(series);
-  const deal = dealScore(stats);
-  const fc = forecast(stats, new Date());
-  const verdict = buildVerdict(stats, deal, fc);
-  state.stats = stats; state.deal = deal; state.fc = fc;
+  const stats = computeStats(series);   // drives the chart itself (lo/hi dots, avg line)
+  const deal = dealScore(full);
+  const fc = forecast(full, new Date());
+  const verdict = buildVerdict(full, deal, fc);
+  state.stats = stats; state.full = full; state.deal = deal; state.fc = fc;
 
-  const offers = buildOffers(parsed, stats.current.price, data.seed, data.ebay ? { eBay: data.ebay } : {});
+  const offers = buildOffers(parsed, full.current.price, data.seed, data.ebay ? { eBay: data.ebay } : {});
   const cheapest = offers.find((o) => o.best);
   const title = parsed.title;
 
@@ -106,9 +110,10 @@ function draw() {
   const recorded = liveSrc
     ? getRecorded(title).filter((m) => m.t >= series[0].t)
     : [];
-  const hitBanner = watched && liveSrc && stats.current.price <= watched.target
+  state.recorded = recorded;
+  const hitBanner = watched && liveSrc && full.current.price <= watched.target
     ? `<div class="card notice hit reveal d1">${ICON.target}
-        <p><strong>Target hit!</strong> ${escapeHtml(title)} is at ${fmt.format(stats.current.price)} —
+        <p><strong>Target hit!</strong> ${escapeHtml(title)} is at ${fmt.format(full.current.price)} —
         at or below your ${fmt.format(watched.target)} target.</p></div>`
     : "";
 
@@ -149,17 +154,17 @@ function draw() {
       </div>
       <div class="price-now">
         <span class="label">Current price</span>
-        <span class="val">${fmt.format(stats.current.price)}</span>
-        <span class="delta ${stats.weekDelta >= 0 ? "up" : "down"}">${stats.weekDelta >= 0 ? "▲" : "▼"} ${pct1(stats.weekDelta)} this week</span>
+        <span class="val">${fmt.format(full.current.price)}</span>
+        <span class="delta ${full.weekDelta >= 0 ? "up" : "down"}">${full.weekDelta >= 0 ? "▲" : "▼"} ${pct1(full.weekDelta)} this week</span>
       </div>
       ${scoreGauge(deal)}
     </div>
 
     <div class="stats reveal d2">
-      ${stat("lo", "Yearly low", fmt.format(stats.lo.price), dateShort(new Date(stats.lo.t)))}
-      ${stat("hi", "Yearly high", fmt.format(stats.hi.price), dateShort(new Date(stats.hi.t)))}
-      ${stat("", "Average", fmt.format(stats.avg), "typical price")}
-      ${stat("", "Off peak", pct(stats.offHigh), "below the high")}
+      ${stat("lo", "Yearly low", fmt.format(full.lo.price), dateShort(new Date(full.lo.t)))}
+      ${stat("hi", "Yearly high", fmt.format(full.hi.price), dateShort(new Date(full.hi.t)))}
+      ${stat("", "Average", fmt.format(full.avg), "typical price")}
+      ${stat("", "Off peak", pct(full.offHigh), "below the high")}
     </div>
 
     <div class="card chart-card reveal d3">
@@ -315,6 +320,8 @@ function beginTargetEdit(card, q) {
     const v = parseFloat(inp.value);
     if (Number.isFinite(v) && v > 0) setTarget(q, Math.round(v * 100) / 100);
     renderWatchlist();
+    // The on-screen result carries a target-hit banner — keep it in step.
+    if (state && state.parsed.title.toLowerCase() === q.toLowerCase()) draw();
   };
   inp.addEventListener("keydown", (e) => {
     if (e.key === "Enter") inp.blur();
@@ -337,7 +344,8 @@ async function handleAction(btn) {
       flash(btn, "Saved CSV");
     } else if (act === "png") {
       flash(btn, "Rendering…");
-      await exportPNG(parsed.title, series, stats, theme(), activeRange === 365 && fc ? fc.projection : null);
+      await exportPNG(parsed.title, series, stats, theme(),
+        activeRange === 365 && fc ? fc.projection : null, state.recorded || []);
       flash(btn, "Saved PNG");
     }
   } catch {
@@ -621,6 +629,7 @@ document.addEventListener("click", (e) => { if (!e.target.closest(".search")) hi
 // Press "/" anywhere to jump to search (like GitHub/YouTube).
 addEventListener("keydown", (e) => {
   if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (scanner && !scanner.hidden) return;   // don't reach behind the scanner overlay
   const a = document.activeElement;
   if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable)) return;
   e.preventDefault();

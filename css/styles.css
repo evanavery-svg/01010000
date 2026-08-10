@@ -635,8 +635,8 @@ body {
   gap: 12px; flex-wrap: wrap; margin-top: 14px;
   padding-top: 14px; border-top: 1px solid var(--stroke);
 }
-.legend { display: flex; gap: 16px; font-size: 12.5px; color: var(--text-2); }
-.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 12.5px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
 .sw { width: 15px; height: 3px; border-radius: 2px; display: inline-block; }
 .sw.line { background: var(--orange); }
 .sw.avg { background: var(--text-3); }
@@ -706,7 +706,7 @@ body {
 .watch-card.hit { border-color: rgba(52,199,89,.45); background: rgba(52,199,89,.06); }
 .wc-open {
   display: flex; align-items: center; gap: 12px; text-align: left;
-  background: none; border: none; padding: 0 18px 0 0;
+  background: none; border: none; padding: 0 34px 0 0;   /* clear the absolutely-positioned × */
   color: var(--text); font-family: inherit; cursor: pointer; min-width: 0;
 }
 .wc-main { flex: 1; min-width: 0; }

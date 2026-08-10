@@ -38,7 +38,7 @@ export function exportCSV(title, series) {
 }
 
 /* ---- PNG export: rasterize a self-contained SVG of the chart ---- */
-export async function exportPNG(title, series, stats, theme = "dark", projection = null) {
+export async function exportPNG(title, series, stats, theme = "dark", projection = null, marks = []) {
   const colors = EXPORT_COLORS[theme] || EXPORT_COLORS.dark;
   const scale = 2;
   const W = 760, H = 300, padTop = 84, padBottom = 28, padX = 24;
@@ -46,7 +46,7 @@ export async function exportPNG(title, series, stats, theme = "dark", projection
   const cardH = H + padTop + padBottom;
 
   const { svg: chartSvg } = renderChartSVG(series, stats, {
-    colors, projection, gradientId: "exp", live: false,
+    colors, projection, marks, gradientId: "exp", live: false,
   });
   // strip the outer <svg> wrapper, keep inner markup, then re-embed positioned
   const inner = chartSvg.replace(/^[\s\S]*?>/, "").replace(/<\/svg>\s*$/, "");

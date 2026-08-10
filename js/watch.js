@@ -22,7 +22,9 @@ function save(k, v) {
 /* ---- Watchlist: [{ q, target, price, image, live, added }] ---- */
 
 export function getWatchlist() {
-  return load(WATCH_KEY, []).filter((w) => w && w.q && Number.isFinite(w.target));
+  const raw = load(WATCH_KEY, []);
+  if (!Array.isArray(raw)) return [];   // corrupt/foreign value — don't take the page down
+  return raw.filter((w) => w && w.q && Number.isFinite(w.target));
 }
 
 export function getWatch(q) {
